@@ -1,6 +1,7 @@
 'use strict';
 
 import * as fs from 'fs';
+import * as request from 'request';
 import * as Web3 from 'web3';
 import * as TestRPC from 'ethereumjs-testrpc';
 import * as solc from 'solc';
@@ -177,8 +178,11 @@ class Eth {
     });
   }
 
-  getPredefinedContractList (): Promise<Array<string>> {
-    return this.getFolderContents('./src/contracts');
+  async getPredefinedContractList (): Promise<Array<string>> {
+    const contracts = await this.getFolderContents('./src/contracts');
+    const formatted = contracts.map((contract: string) => `${contract}.sol`);
+
+    return formatted;
   }
 
   async getPredefinedContract (id: string): Promise<EthContract> {
@@ -278,7 +282,7 @@ class Eth {
     return Contract;
   }
 
-  async deployNewContract (contract: EthContract, params: Array<any>): Promise<EthTransaction> {
+  async deployNewContract (contract: EthContract, params: Array<any>, callbackUrl?: string): Promise<EthTransaction> {
     const ContractInterface = this.getContractInterface(contract.abi);
     const simulation = ContractInterface.new.getData(...params, { data: contract.bytecode });
     const gas = await this.estimateGas(simulation);
@@ -290,6 +294,11 @@ class Eth {
           return reject(err);
         }
 
+        if (callbackUrl) {
+          // end the request early
+          resolve();
+        }
+
         if (res.address) {
           // address is only returned the second time the callback is executed
           result.from = ContractInterface.eth.defaultAccount;
@@ -297,21 +306,25 @@ class Eth {
           result.transaction = res.transactionHash;
           result.gas = gas;
 
-          return resolve(result);
+          if (callbackUrl) {
+            this.invokeCallbackUrl(callbackUrl, result);
+          } else {
+            return resolve(result);
+          }
         }
       });
     });
   }
 
-  async invokeContractMethod (contract: EthContract, address: string, method: string, params: Array<any>): Promise<EthTransaction> {
+  async invokeContractMethod (contract: EthContract, address: string, method: string, params: Array<any>, callbackUrl?: string): Promise<EthTransaction> {
     if (params && params.length) {
-      return this.invokeWithParams(contract, address, method, params);
+      return this.invokeWithParams(contract, address, method, params, callbackUrl);
     } else {
-      return this.invokeWithoutParams(contract, address, method);
+      return this.invokeWithoutParams(contract, address, method, callbackUrl);
     }
   }
 
-  protected async invokeWithoutParams (contract: EthContract, address: string, method: string): Promise<EthTransaction> {
+  protected async invokeWithoutParams (contract: EthContract, address: string, method: string, callbackUrl?: string): Promise<EthTransaction> {
     const ContractInterface = this.getContractInterface(contract.abi);
     const contractInstance = ContractInterface.at(address);
     const gas = await this.estimateGasContractInvocation(contractInstance, method);
@@ -323,17 +336,26 @@ class Eth {
           return reject(err);
         }
 
+        if (callbackUrl) {
+          // end the request early
+          resolve();
+        }
+
         result.from = ContractInterface.eth.defaultAccount;
         result.to = address;
         result.result = res;
         result.gas = gas;
 
-        return resolve(result);
+        if (callbackUrl) {
+          this.invokeCallbackUrl(callbackUrl, result);
+        } else {
+          return resolve(result);
+        }
       });
     });
   }
 
-  async invokeWithParams (contract: EthContract, address: string, method: string, params: Array<any>): Promise<EthTransaction> {
+  async invokeWithParams (contract: EthContract, address: string, method: string, params: Array<any>, callbackUrl?: string): Promise<EthTransaction> {
     const ContractInterface = this.getContractInterface(contract.abi);
     const contractInstance = ContractInterface.at(address);
     const gas = await this.estimateGasContractInvocation(contractInstance, method, params);
@@ -345,12 +367,21 @@ class Eth {
           return reject(err);
         }
 
+        if (callbackUrl) {
+          // end the request early
+          resolve();
+        }
+
         result.from = ContractInterface.eth.defaultAccount;
         result.to = address;
         result.result = res;
         result.gas = gas;
 
-        return resolve(result);
+        if (callbackUrl) {
+          this.invokeCallbackUrl(callbackUrl, result);
+        } else {
+          return resolve(result);
+        }
       });
     });
   }
@@ -378,6 +409,12 @@ class Eth {
 
     resolve(res);
   }
+
+  async invokeCallbackUrl(url: string, data: Object): Promise<any> {
+    return new Promise((resolve, reject) => {
+      return request.post({ url, json: data }, (err, res, body) => this.resolve(err, res, reject, resolve));
+    });
+  }
 }
 
-export { Eth, EthConfig };
+export { Eth, EthConfig, EthContract, EthTransaction };
