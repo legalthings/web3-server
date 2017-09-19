@@ -10,9 +10,10 @@ import * as logger from 'morgan';
 import * as errorHandler from 'errorhandler';
 import * as path from 'path';
 import * as config from 'config';
+import * as expressValidator from 'express-validator';
 
+// libs
 import { Eth, EthConfig } from './libs/eth';
-import expressValidator = require('express-validator');
 
 // controllers
 import { defaultController } from './controllers/default';
@@ -36,7 +37,7 @@ app.get('/', defaultController.info);
 app.get('/eth', ethController.info);
 app.get('/eth/contracts', contractController.list);
 app.get('/eth/contracts/:id', contractController.get);
-app.post('/eth/contracts', contractController.create);
+app.post('/eth/contracts/:id', contractController.invoke);
 
 // error handler
 app.use(errorHandler());

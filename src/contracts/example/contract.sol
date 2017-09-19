@@ -5,6 +5,7 @@ contract Coin {
     // readable from outside.
     address public minter;
     mapping (address => uint) public balances;
+    uint32 public value;
 
     // Events allow light clients to react on
     // changes efficiently.
@@ -12,25 +13,30 @@ contract Coin {
 
     // This is the constructor whose code is
     // run only when the contract is created.
-    function Coin() {
+    function Coin(uint32 _value) {
+        value = _value;
         minter = msg.sender;
     }
 
-    function mint(address receiver, uint amount) {
+    function mint(address _receiver, uint _amount) {
         if (msg.sender != minter) {
             return;
         }
         
-        balances[receiver] += amount;
+        balances[_receiver] += _amount;
     }
 
-    function send(address receiver, uint amount) {
-        if (balances[msg.sender] < amount) {
+    function send(address _receiver, uint _amount) {
+        if (balances[msg.sender] < _amount) {
             return;
         }
 
-        balances[msg.sender] -= amount;
-        balances[receiver] += amount;
-        Sent(msg.sender, receiver, amount);
+        balances[msg.sender] -= _amount;
+        balances[_receiver] += _amount;
+        Sent(msg.sender, _receiver, _amount);
+    }
+    
+    function setValue(uint32 _value) {
+        value = _value;
     }
 }

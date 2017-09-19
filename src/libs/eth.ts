@@ -1,22 +1,31 @@
 'use strict';
 
 import * as fs from 'fs';
-
-// no typings available
-const Web3 = require('web3');
-const TestRPC = require('ethereumjs-testrpc');
-const solc = require('solc');
+import * as Web3 from 'web3';
+import * as TestRPC from 'ethereumjs-testrpc';
+import * as solc from 'solc';
 
 interface EthConfig {
   web3: {
     url: string;
     address?: string;
   };
-  node?: {
-    port: number;
-    networkid: number;
-    rpcport: number;
-  };
+}
+
+interface EthContract {
+  sol: string;
+  abi: Object;
+  bytecode: string;
+  gas: number;
+}
+
+interface EthTransaction {
+
+  transaction?: string;
+  from?: string;
+  to?: string;
+  gas?: number;
+  result?: any;
 }
 
 class Eth {
@@ -58,9 +67,10 @@ class Eth {
   }
 
   static startNode (config: EthConfig): Promise<any> {
-    if (config.node) {
-      return Eth.startGethNodeServer(config.node);
-    }
+    // @todo: not possible to start real geth node from within the webserver yet
+    // if (config.node) {
+    //   return Eth.startGethNodeServer(config.node);
+    // }
 
     return Eth.startTestRpcServer(8545);
   }
@@ -168,20 +178,38 @@ class Eth {
   }
 
   getPredefinedContractList (): Promise<Array<string>> {
-    return new Promise((resolve, reject) => {
-      fs.readdir('./src/contracts', (err: any, res: any) => {
-        if (err) {
-          return reject(err);
-        }
-
-        resolve(res);
-      });
-    });
+    return this.getFolderContents('./src/contracts');
   }
 
-  getPredefinedContract (id: string): Promise<Array<string>|null> {
+  async getPredefinedContract (id: string): Promise<EthContract> {
+    const folder = this.removeFileExtension(id);
+    const files = await this.getFolderContents(`./src/contracts/${folder}`);
+
+    if (!files) {
+      return;
+    }
+
+    let sol = await this.getFileContents(`./src/contracts/${folder}/contract.sol`);
+    sol = sol ? sol.trim() : null;
+
+    let abi = await this.getFileContents(`./src/contracts/${folder}/contract.abi`);
+    abi = abi ? JSON.parse(abi) : null;
+
+    let bytecode = await this.getFileContents(`./src/contracts/${folder}/contract.bytecode`);
+    bytecode = bytecode ? bytecode.trim() : null;
+
+    if (bytecode && !bytecode.startsWith('0x')) {
+      bytecode = `0x${bytecode}`;
+    }
+
+    const gas = bytecode ? await this.estimateGas(bytecode) : null;
+
+    return { sol, abi, bytecode, gas };
+  }
+
+  protected getFolderContents (folder: string): Promise<Array<string>> {
     return new Promise((resolve, reject) => {
-      fs.readFile(`./src/contracts/${id}`, { encoding: 'utf8' }, (err: any, res: any) => {
+      fs.readdir(folder, (err: any, res: any) => {
         if (err) {
           return resolve(null);
         }
@@ -191,12 +219,32 @@ class Eth {
     });
   }
 
+  protected getFileContents (filepath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      fs.readFile(filepath, { encoding: 'utf8' }, (err: any, res: any) => {
+        if (err) {
+          return resolve(null);
+        }
+
+        resolve(res);
+      });
+    });
+  }
+
+  protected getFileExtension (filename: string): string {
+    return filename.split('.').pop();
+  }
+
+  protected removeFileExtension (filename: string): string {
+    return filename.replace(/\.[^/.]+$/, '');
+  }
+
   isSolidityFilename (filename: string): boolean {
     return (/\.(sol)$/i).test(filename);
   }
 
   compileSolidityCode (code: string, mode: string = 'compact'): Promise<any> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const compiled = solc.compile(code, 1);
 
       if (compiled.errors) {
@@ -211,41 +259,124 @@ class Eth {
 
       for (const contract in compiled.contracts) {
         const name = contract.replace(/:/g, '');
-        compact[name] = ({
+        compact[name] = {
+          sol: code,
           abi: JSON.parse(compiled.contracts[contract].interface),
-          bytecode: compiled.contracts[contract].bytecode
-        });
+          bytecode: compiled.contracts[contract].bytecode,
+          gas: await this.estimateGas(compiled.contracts[contract].bytecode)
+        };
       }
 
       resolve(compact);
     });
   }
 
-  async createContractObjects (data: {[name: string]: {abi: string, bytecode: string}}) {
-    const result: any = {};
+  getContractInterface (abi: Object): any {
+    const Contract = this.web3.eth.contract(abi);
+    Contract.eth.defaultAccount = this.getDefaultAccount();
 
-    for (const name in data) {
-      result[name] = {
-        contract: this.web3.eth.contract(data[name].abi),
-        abi: data[name].abi,
-        bytecode: data[name].bytecode,
-        gas: await this.estimateGas(data[name].bytecode)
-      };
-    }
-
-    return result;
+    return Contract;
   }
 
-  estimateGas (bytecode: string): Promise<any> {
+  async deployNewContract (contract: EthContract, params: Array<any>): Promise<EthTransaction> {
+    const ContractInterface = this.getContractInterface(contract.abi);
+    const simulation = ContractInterface.new.getData(...params, { data: contract.bytecode });
+    const gas = await this.estimateGas(simulation);
+    const result: EthTransaction = {};
+
     return new Promise((resolve, reject) => {
-      this.web3.eth.estimateGas({ data: bytecode }, (err: any, res: any) => {
+      ContractInterface.new(...params, { data: contract.bytecode, gas: gas }, (err: any, res: any) => {
         if (err) {
           return reject(err);
         }
 
-        resolve(res);
+        if (res.address) {
+          // address is only returned the second time the callback is executed
+          result.from = ContractInterface.eth.defaultAccount;
+          result.to = res.address;
+          result.transaction = res.transactionHash;
+          result.gas = gas;
+
+          return resolve(result);
+        }
       });
     });
+  }
+
+  async invokeContractMethod (contract: EthContract, address: string, method: string, params: Array<any>): Promise<EthTransaction> {
+    if (params && params.length) {
+      return this.invokeWithParams(contract, address, method, params);
+    } else {
+      return this.invokeWithoutParams(contract, address, method);
+    }
+  }
+
+  protected async invokeWithoutParams (contract: EthContract, address: string, method: string): Promise<EthTransaction> {
+    const ContractInterface = this.getContractInterface(contract.abi);
+    const contractInstance = ContractInterface.at(address);
+    const gas = await this.estimateGasContractInvocation(contractInstance, method);
+    const result: EthTransaction = {};
+
+    return new Promise((resolve, reject) => {
+      contractInstance[method]({ gas: gas }, (err: any, res: any) => {
+        if (err) {
+          return reject(err);
+        }
+
+        result.from = ContractInterface.eth.defaultAccount;
+        result.to = address;
+        result.result = res;
+        result.gas = gas;
+
+        return resolve(result);
+      });
+    });
+  }
+
+  async invokeWithParams (contract: EthContract, address: string, method: string, params: Array<any>): Promise<EthTransaction> {
+    const ContractInterface = this.getContractInterface(contract.abi);
+    const contractInstance = ContractInterface.at(address);
+    const gas = await this.estimateGasContractInvocation(contractInstance, method, params);
+    const result: EthTransaction = {};
+
+    return new Promise((resolve, reject) => {
+      contractInstance[method](...params, { gas: gas }, (err: any, res: any) => {
+        if (err) {
+          return reject(err);
+        }
+
+        result.from = ContractInterface.eth.defaultAccount;
+        result.to = address;
+        result.result = res;
+        result.gas = gas;
+
+        return resolve(result);
+      });
+    });
+  }
+
+  estimateGas (bytecode: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.web3.eth.estimateGas({ data: bytecode }, (err: any, res: any) => this.resolve(err, res, reject, resolve));
+    });
+  }
+
+  estimateGasContractInvocation (instance: any, method: string, params?: Array<any>): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (params) {
+        return instance[method].estimateGas(...params, (err: any, res: any) => this.resolve(err, res, reject, resolve));
+      }
+
+      instance[method].estimateGas((err: any, res: any) => this.resolve(err, res, reject, resolve));
+    });
+  }
+
+  protected resolve(err: any, res: any, reject: any, resolve: any): Promise<any> {
+    if (err) {
+      return reject(err);
+    }
+
+    resolve(res);
   }
 }
 

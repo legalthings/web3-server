@@ -28,55 +28,56 @@ class ContractController {
    */
   get = async (req: Request, res: Response) => {
     const eth = await Eth.create(this.settings);
+
+    if (!eth.isSolidityFilename(req.params.id)) {
+      return res.status(400).send('Contract must end with a .sol extension');
+    }
+
     const contract = await eth.getPredefinedContract(req.params.id);
 
     if (!contract) {
-      res.status(404).send('Not found');
+      return res.status(404).send('Not found');
     }
 
-    res.type('text/plain').send(contract);
+    res.json(contract);
   }
 
   /**
-   * POST /eth/contracts
-   * Create transaction based on predefined contract
+   * POST /eth/contracts/id
+   * Invoke methods on predefined contract or instantiate it
    */
-  create = async (req: Request, res: Response) => {
+  invoke = async (req: Request, res: Response) => {
     const eth = await Eth.create(this.settings);
 
     if (!req.body) {
       return res.status(400).send('Invalid payload');
     }
 
-    if (!req.body.contract) {
+    if (!req.params.id) {
       return res.status(400).send('Contract not given');
     }
 
-    const contract = eth.isSolidityFilename(req.body.contract) ?
-      await eth.getPredefinedContract(req.body.contract) :
-      req.body.contract;
+    if (req.body.address && !req.body.method) {
+      return res.status(400).send('Address was given but method was not');
+    }
+
+    if (!eth.isSolidityFilename(req.params.id)) {
+      return res.status(400).send('Contract must end with a .sol extension');
+    }
+
+    const contract = await eth.getPredefinedContract(req.params.id);
 
     if (!contract) {
-      res.status(404).send('Not found');
+      return res.status(404).send('Not found');
     }
 
-    const compiled = await eth.compileSolidityCode(contract).catch((err) => {
-      return res.status(400).send('Contract contains errors:\n\n' + err);
-    });
+    const result = req.body.address ?
+      await eth.invokeContractMethod(contract, req.body.address, req.body.method, req.body.params)
+        .catch((err) => res.status(400).send(`Failed to invoke contract method:\n\n${err}`)) :
+      await eth.deployNewContract(contract, req.body.params || [])
+        .catch((err) => res.status(400).send(`Failed to deploy new contract:\n\n${err}`));
 
-    const create = req.body.create || null;
-
-    for (const contract in compiled) {
-      if (create && !create[contract]) {
-        continue;
-      }
-    }
-
-    const contracts = await eth.createContractObjects(compiled);
-
-    // @todo: create transactions
-
-    res.end();
+    res.json(result);
   }
 }
 
