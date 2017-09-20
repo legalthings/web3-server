@@ -1,9 +1,61 @@
-{
-  "language": "node_js",
-  "node_js": "8",
-  "services": [],
-  "script": [
-    "npm run build",
-    "npm run test"
-  ]
-}
+language: node_js
+node_js:
+  - "4.4"
+sudo: false
+
+# Add your branch here to have it tested and deployed
+branches:
+  only:
+  - master
+
+before_install:
+# Configure Git
+- git config --global user.email "travis-ci@legalthings.net"
+- git config --global user.name "Travis CI"
+
+# Get all tags of git repo
+- git fetch origin 'refs/tags/*:refs/tags/*'
+
+after_success:
+# Bump version
+- npm install mversion -g
+- test "$TRAVIS_BRANCH" != 'master' -o "$TRAVIS_PULL_REQUEST" != "false" || test -n "$(git tag --contains)" || bin/bump-version
+
+before_deploy:
+# Set environment variables for Elastic Beanstalk deploy
+- export ELASTIC_BEANSTALK_ENV="web3-server-${TRAVIS_BRANCH}"
+- export ELASTIC_BEANSTALK_LABEL=$(git tag --contains)
+- test -n "$ELASTIC_BEANSTALK_LABEL" || export ELASTIC_BEANSTALK_LABEL="${TRAVIS_BRANCH}-${TRAVIS_COMMIT:0:7}"
+
+deploy:
+# Staging
+- provider: elasticbeanstalk
+  edge:
+     source: jasny/dpl
+     branch: master
+  access_key_id: AKIAIWFAXQWNDAHESRAA
+  secret_access_key:
+    secure: "BfMyX011UORzx7ybfdQ69WwM5K5zy72zbfygLOwgXTgXto0bDx8if2HL/r3sVPH4W17JZZ4md79ryJE84Mon38/Fh5By2O2B0ZigmjB+iKnFnbVIFyy35WfsRtnq+R+JUXI0kTURMmb09NzdY6Ve/EMlDhxaxkNy5f/t+PP7rtY="
+  region: eu-west-1
+  app: web3-server
+  bucket_name: elasticbeanstalk-eu-west-1-930677074220
+  bucket_path: web3-server
+  on:
+    all_branches: true
+    condition: '"${TRAVIS_BRANCH:0:7}" != "travis-"'
+
+# Production
+- provider: elasticbeanstalk
+  edge:
+     source: jasny/dpl
+     branch: master
+  access_key_id: AKIAJQQQ7NJVV6B67VCA
+  secret_access_key:
+    secure: "TVTdwbGxPt/dozONEbrrizPXNgOMZGb67idxhHpCtWnXrHqh0jO4Y6BQlthUVgOJ+w2IsXXjQ3YAASKqPvl+o5jPKXlf9EWTeN1TgQFiMV8p1Q03cMbO2yxXiKOzPshKPm9CCVQbYLFMRbv+S64WQYh8scj+NIRvfkCKM0PD0xM="
+  region: eu-west-1
+  app: web3-server
+  bucket_name: elasticbeanstalk-eu-west-1-044051773080
+  bucket_path: web3-server
+  only_create_app_version: true
+  on:
+    branch: master
