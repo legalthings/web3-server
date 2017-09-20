@@ -22,7 +22,6 @@ import { contractController } from './controllers/contract';
 
 // express
 const app = express();
-app.set('port', process.env.PORT || 3000);
 app.set('views', path.join(__dirname, '../views'));
 app.set('view engine', 'pug');
 app.use(compression());
@@ -43,8 +42,8 @@ app.post('/eth/contracts/:id', contractController.invoke);
 app.use(errorHandler());
 
 // start server
-app.listen(app.get('port'), () => {
-  console.log(('App is running at http://localhost:%d in %s mode'), app.get('port'), app.get('env'));
+app.listen(config.get('port'), () => {
+  console.log(('App is running at http://localhost:%d in %s mode'), config.get('port'), app.get('env'));
   console.log('Press CTRL-C to stop\n');
 });
 

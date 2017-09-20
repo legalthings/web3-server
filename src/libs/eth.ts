@@ -21,7 +21,6 @@ interface EthContract {
 }
 
 interface EthTransaction {
-
   transaction?: string;
   from?: string;
   to?: string;
