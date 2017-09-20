@@ -1,61 +1,73 @@
 language: node_js
 node_js:
-  - "4.4"
+- "6.9.5"
 sudo: false
-
-# Add your branch here to have it tested and deployed
+cache:
+  directories:
+    - node_modules
 branches:
   only:
   - master
 
+env:
+  global:
+  - ENVIRONMENT=production
+  - AWS_ACCESS_KEY_ID=AKIAIWFAXQWNDAHESRAA
+  - secure: "N9ES94Hks9hCBBST5KGZHtCGhaq1ke8Cr1o8a2NQxfoESBdB/xzPZEdAGrY//Qq2n1u+gIk7lyj0Ww74UosjNMFLXnqtynXob2PlORlizSi4otlUXFeagk6ViZ6fO40SGc0wOt/gXpgehEixOrExroq15LR2wXELpdXzMlgnOKCzg2IFhZtfl1elq8bCSvxqr/kjl/yD5vHF8bY1z7ToP8W3cTRFTE1oXk8p+2Q1eTZhO7dKRauVIChE7w+T28n+E8vMcU++5Ai6w/ZBRc1skUzXwrAzSbv3ZaD1QK8maX63yWxKEPM+ENytYfugks7p0NtIGTPB2zhJNJl6gqaKQnZ/sTBMg64DqzquIG1XBI12TOeNIyvs4Xq8Nyu3E+T18A2rFWp2TjVK8kfbxSeCsD1hmO/dkFM9+Sg3KHklHEzsgqzom2ajmoAzSJ5S1wwSQtjUqbhKpL5Cr4GztqCxmBok7CnHsSD4vIcg+x53lQRHgyegb3j/8Z306HcYrMPdYOsTmG4EjwCrKmoCRifg+ptj6P0uRpD/5NlGNHyimh6fKo+NxRBE5gGGP/F6trTUE0dE0RVVki5MOlcwaHlpTsFhcmCIhgeejLiTy4JWGiOdXqNFlkr6aPhuv4V2AURSfkh+1UGAkwWs48eEzZ2a+R6ry4lb1feKveHdWGhAs9M="
+
+
 before_install:
-# Configure Git
 - git config --global user.email "travis-ci@legalthings.net"
 - git config --global user.name "Travis CI"
-
-# Get all tags of git repo
 - git fetch origin 'refs/tags/*:refs/tags/*'
+install:
+- npm install
+
+before_script:
+- export DISPLAY=:99.0
+- export PATH=./node_modules/.bin/:$PATH
+- sh -e /etc/init.d/xvfb start
+script:
+- npm test
+- npm run build
 
 after_success:
-# Bump version
-- npm install mversion -g
-- test "$TRAVIS_BRANCH" != 'master' -o "$TRAVIS_PULL_REQUEST" != "false" || test -n "$(git tag --contains)" || bin/bump-version
+- export BUMP=$(test "$TRAVIS_BRANCH" == 'master' -a "$TRAVIS_PULL_REQUEST" == "false" && echo 'yes')
+- test -z "$BUMP" || npm run bump-version
+- test -z "$BUMP" || PACKAGE_VERSION=$(git tag --contains)
+- test -n "$BUMP" || PACKAGE_VERSION="$TRAVIS_BRANCH-${TRAVIS_COMMIT:0:7}"
+- echo -e "\e[44mlegalthings/web3-server \e[1m$PACKAGE_VERSION\e[0m"
 
 before_deploy:
-# Set environment variables for Elastic Beanstalk deploy
-- export ELASTIC_BEANSTALK_ENV="web3-server-${TRAVIS_BRANCH}"
-- export ELASTIC_BEANSTALK_LABEL=$(git tag --contains)
-- test -n "$ELASTIC_BEANSTALK_LABEL" || export ELASTIC_BEANSTALK_LABEL="${TRAVIS_BRANCH}-${TRAVIS_COMMIT:0:7}"
-
+- pip install --user awsebcli
+- export S3_UPLOAD_DIR="master" # Only applies to staging
 deploy:
-# Staging
-- provider: elasticbeanstalk
+- provider: s3
   edge:
-     source: jasny/dpl
-     branch: master
-  access_key_id: AKIAIWFAXQWNDAHESRAA
-  secret_access_key:
-    secure: "BfMyX011UORzx7ybfdQ69WwM5K5zy72zbfygLOwgXTgXto0bDx8if2HL/r3sVPH4W17JZZ4md79ryJE84Mon38/Fh5By2O2B0ZigmjB+iKnFnbVIFyy35WfsRtnq+R+JUXI0kTURMmb09NzdY6Ve/EMlDhxaxkNy5f/t+PP7rtY="
+    source: jasny/dpl
+    branch: master
+  skip_cleanup: true
   region: eu-west-1
-  app: web3-server
-  bucket_name: elasticbeanstalk-eu-west-1-930677074220
-  bucket_path: web3-server
+  bucket: web3-server
+  local_dir: dist
   on:
     all_branches: true
-    condition: '"${TRAVIS_BRANCH:0:7}" != "travis-"'
-
-# Production
-- provider: elasticbeanstalk
+- provider: s3
   edge:
-     source: jasny/dpl
-     branch: master
+    source: legalthings/dpl
+    branch: master
   access_key_id: AKIAJQQQ7NJVV6B67VCA
+  skip_cleanup: true
   secret_access_key:
-    secure: "TVTdwbGxPt/dozONEbrrizPXNgOMZGb67idxhHpCtWnXrHqh0jO4Y6BQlthUVgOJ+w2IsXXjQ3YAASKqPvl+o5jPKXlf9EWTeN1TgQFiMV8p1Q03cMbO2yxXiKOzPshKPm9CCVQbYLFMRbv+S64WQYh8scj+NIRvfkCKM0PD0xM="
+    secure: "Cr+3rrGeWRRdfJVsPXoAthL9x9EZMoOIlQGET9zB0E4oyUW5FQ0EC9uDBosD4tzEQBms62LV7KwqoNWcwBg/EIMNCH3/1FaVRNjmy7AOKpqWJgWhKSqioyiC7EXtLqR2dVDvKhWNK3ERZYkkyGfxqzLle044Gb08XYQ1s5uN8Qxl6LPx2h27Yu0m89z7Z+g0lFfUYSPOc6fB01HkDX7JHeTpPjmV3oHNEjakTDn1LA5S6MLnaaJbVFOB5IsuQ9LmcqECkc9IFQQqiGqfKhMUCfG1ehCzah89PXwK4SH2eSY8FBJyXhnSg9ECLfCxyrZuqjUt+fxsz5+0sbpb4gGjlMj/Ca0yA2jrrazlwHIs4MGOOYHE2bp3qAmGQOZ/1GYt41CNYEwmSSABE34INy2fbcTeRl8a1epYEkUjBU3hvBAAZLeqxAXf8lJ1NYb2wOX5DdGSmuzqiymJ4jn+/KsOIuVqRLkltBr/VAopdBOT1Ew3B1Quu4t/OF4vOsWANMDBDiEz1VKbtgbbOKdKd5Y8zFep3NPJJao1eYurH83SCfLAd+P3XFbi2fEL+PpBJv2D9f7SURLh0H18+ZxA8sxqp8CZxIRejXnYENhayiUwjsDx5QnO67+XNz7QVQJlzwQg7VvJEAVxiVTYHsdnooP033Q6XT9VZYlXif5II+T2CbY="
   region: eu-west-1
-  app: web3-server
-  bucket_name: elasticbeanstalk-eu-west-1-044051773080
-  bucket_path: web3-server
-  only_create_app_version: true
+  bucket: web3-server
+  upload_dir: /
+  local_dir: dist
   on:
     branch: master
+after_deploy:
+- git checkout "$TRAVIS_BRANCH"
+- eb init --region eu-west-1 web3-server --platform Node.js
+- EB_EXISTS=$(eb list | grep -q "web3-server-master" && echo "yes")
+- test -z "$EB_EXISTS" || eb setenv -e web3-server-master ASSET_VERSION="$PACKAGE_VERSION"
