@@ -1,6 +1,6 @@
 // env vars
 process.env.NODE_ENV = process.env.NODE_ENV || 'dev';
-process.env.NODE_CONFIG_DIR = process.cwd() + '/dist/config';
+process.env.NODE_CONFIG_DIR = process.cwd() + '/src/config';
 
 // imports
 import * as config from 'config';

@@ -1,6 +1,6 @@
 // env vars
 process.env.NODE_ENV = 'tests';
-process.env.NODE_CONFIG_DIR = process.cwd() + '/dist/config';
+process.env.NODE_CONFIG_DIR = process.cwd() + '/src/config';
 
 // imports
 import { } from 'jest';
