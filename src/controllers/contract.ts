@@ -71,11 +71,15 @@ class ContractController {
       return res.status(404).send('Not found');
     }
 
-    const result = req.body.address ?
-      await eth.invokeContractMethod(contract, req.body.address, req.body.method, req.body.params, req.body.callback_url)
-        .catch((err) => res.status(400).send(`Failed to invoke contract method:\n\n${err}`)) :
-      await eth.deployNewContract(contract, req.body.params || [], req.body.callback_url)
-        .catch((err) => res.status(400).send(`Failed to deploy new contract:\n\n${err}`));
+    let result = null;
+
+    try {
+      result = req.body.address ?
+        await eth.invokeContractMethod(contract, req.body.address, req.body.method, req.body.params, req.body.callback_url) :
+        await eth.deployNewContract(contract, req.body.params || [], req.body.callback_url);
+    } catch (e) {
+      return res.status(400).send(`Failed to interact with contract:\n\n${e}`);
+    }
 
     if (req.body.callback_url) {
       return res.status(202).send('Request is deferred');

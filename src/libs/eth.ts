@@ -47,7 +47,7 @@ class Eth {
     return eth;
   }
 
-  static startTestRpcServer (port: number): Promise<any> {
+  startTestRpcServer (port: number): Promise<any> {
     return new Promise((resolve, reject) => {
       TestRPC.server().listen(port, (err: any, res: any) => {
         if (err) {
@@ -59,20 +59,8 @@ class Eth {
     });
   }
 
-  static startGethNodeServer (options: Object): Promise<any> {
-    return new Promise((resolve, reject) => {
-      console.warn('starting geth node not implemented yet');
-      resolve();
-    });
-  }
-
-  static startNode (config: EthConfig): Promise<any> {
-    // @todo: not possible to start real geth node from within the webserver yet
-    // if (config.node) {
-    //   return Eth.startGethNodeServer(config.node);
-    // }
-
-    return Eth.startTestRpcServer(8545);
+  startNode (): Promise<any> {
+    return this.startTestRpcServer(8545);
   }
 
   getSyncing (): Promise<string> {

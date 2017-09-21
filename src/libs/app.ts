@@ -1,7 +1,3 @@
-// env vars
-process.env.NODE_ENV = process.env.NODE_ENV || 'dev';
-process.env.NODE_CONFIG_DIR = process.cwd() + '/dist/config';
-
 // modules
 import * as express from 'express';
 import * as compression from 'compression';
@@ -9,16 +5,12 @@ import * as bodyParser from 'body-parser';
 import * as logger from 'morgan';
 import * as errorHandler from 'errorhandler';
 import * as path from 'path';
-import * as config from 'config';
 import * as expressValidator from 'express-validator';
 
-// libs
-import { Eth, EthConfig } from './libs/eth';
-
 // controllers
-import { defaultController } from './controllers/default';
-import { ethController } from './controllers/eth';
-import { contractController } from './controllers/contract';
+import { defaultController } from '../controllers/default';
+import { ethController } from '../controllers/eth';
+import { contractController } from '../controllers/contract';
 
 // express
 const app = express();
@@ -41,19 +33,4 @@ app.post('/eth/contracts/:id', contractController.invoke);
 // error handler
 app.use(errorHandler());
 
-// start server
-app.listen(config.get('port'), () => {
-  console.log(('App is running at http://localhost:%d in %s mode'), config.get('port'), app.get('env'));
-  console.log('Press CTRL-C to stop\n');
-});
-
-// start ethereum node
-const ethConfig = config.get('eth') as EthConfig;
-
-Eth.startNode(ethConfig).then(() => {
-  console.log(('Eth node is running at %s'), ethConfig.web3.url);
-}).catch((err) => {
-  console.error(`Failed to start eth node: ${err}`);
-});
-
-export default app;
+export { app };

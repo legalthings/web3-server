@@ -9,6 +9,7 @@ export default class extends ApiTest {
 
   async testGetEthNodeInfo () {
     const response = await this.api.get('/eth');
+    expect(response.status).toBe(200);
     expect(response.header['content-type']).toMatch(/json/);
     expect(response.body).toHaveProperty('accounts');
     expect(response.body).toHaveProperty('default_account');
