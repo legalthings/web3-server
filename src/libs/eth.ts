@@ -4,7 +4,6 @@ import * as fs from 'fs';
 import * as request from 'request';
 import * as Web3 from 'web3';
 import * as TestRPC from 'ethereumjs-testrpc';
-import * as solc from 'solc';
 
 interface EthConfig {
   web3: {
@@ -232,34 +231,6 @@ class Eth {
 
   isSolidityFilename (filename: string): boolean {
     return (/\.(sol)$/i).test(filename);
-  }
-
-  compileSolidityCode (code: string, mode: string = 'compact'): Promise<any> {
-    return new Promise(async (resolve, reject) => {
-      const compiled = solc.compile(code, 1);
-
-      if (compiled.errors) {
-        return reject(compiled.errors);
-      }
-
-      if (mode !== 'compact') {
-        return resolve(compiled);
-      }
-
-      const compact: any = {};
-
-      for (const contract in compiled.contracts) {
-        const name = contract.replace(/:/g, '');
-        compact[name] = {
-          sol: code,
-          abi: JSON.parse(compiled.contracts[contract].interface),
-          bytecode: compiled.contracts[contract].bytecode,
-          gas: await this.estimateGas(compiled.contracts[contract].bytecode)
-        };
-      }
-
-      resolve(compact);
-    });
   }
 
   getContractInterface (abi: Object): any {
