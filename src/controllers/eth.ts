@@ -8,7 +8,7 @@ class EthController {
   public settings: EthConfig;
 
   constructor (settings?: EthConfig) {
-    this.settings = settings || config.get('eth');
+    this.settings = settings || config.get('eth') as EthConfig;
   }
 
   /**
