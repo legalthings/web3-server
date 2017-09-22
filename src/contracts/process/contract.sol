@@ -5,9 +5,9 @@ pragma solidity ^0.4.14;
 //
 contract Process {
     
-    Scenario private scenario;
-    string[] private keys;
-    string[] private events;
+    Scenario public scenario;
+    string[] public keys;
+    string[] public events;
     
     function Process(Scenario _scenario) public {
         scenario = _scenario;

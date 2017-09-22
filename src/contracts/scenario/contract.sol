@@ -5,11 +5,11 @@ pragma solidity ^0.4.14;
 //
 contract Scenario {
 
-    bytes32 private name;
-    uint    private lastVersion;
-    address private creator;
+    bytes32 public name;
+    uint    public lastVersion;
+    address public creator;
     
-    mapping(uint => Version) private versions;
+    mapping(uint => Version) public versions;
 
     struct Version
     {

@@ -38,12 +38,14 @@
     "testEnvironment": "node"
   },
   "dependencies": {
+    "@types/cors": "^2.8.1",
     "async": "^2.1.2",
     "bcrypt-nodejs": "^0.0.3",
     "body-parser": "^1.15.2",
     "commander": "^2.11.0",
     "compression": "^1.6.2",
     "config": "^1.26.2",
+    "cors": "^2.8.4",
     "dotenv": "^2.0.0",
     "errorhandler": "^1.4.3",
     "ethereumjs-testrpc": "^4.1.3",
