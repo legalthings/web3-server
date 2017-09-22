@@ -1,14 +1,15 @@
 pragma solidity ^0.4.14;
-//
+
 // Contract for storing legal Scenario's on the blockchain
-// Ben Rogmans - 2017-09-22.1
+//
+// Author: Ben Rogmans
 //
 contract Scenario {
 
     bytes32 public name;
     uint    public lastVersion;
     address public creator;
-    
+
     mapping(uint => Version) public versions;
 
     struct Version
@@ -33,11 +34,10 @@ contract Scenario {
     }
     
     // Publish a new Scenario
-    function publishScenarioVersion(uint _effectiveDate, string _content, bytes32 _checksum) creatorOnly public {
+    function publishScenarioVersion(uint _effectiveDate, string _content) creatorOnly public {
         
         // Only newer versions can be published
         if(_effectiveDate <= lastVersion) revert();
-        if(sha256(_content) != _checksum) revert();
         
         versions[_effectiveDate] = Version({
             effectiveDate:  _effectiveDate,
@@ -45,5 +45,9 @@ contract Scenario {
         });
         
         lastVersion = _effectiveDate;
+    }
+    
+    function getScenario(uint _version) public constant returns(uint, string) {
+        return(versions[_version].effectiveDate, versions[_version].content);
     }
 }
