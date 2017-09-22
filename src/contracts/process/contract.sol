@@ -1,12 +1,11 @@
 pragma solidity ^0.4.14;
-
 // Contract facilitating a legal process on the blockchain
 //
 // Author: Ben Rogmans
 //
 contract Process {
     
-    Scenario scenario;
+    Scenario public scenario;
     string[] public keys;
     string[] public events;
     
