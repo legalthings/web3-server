@@ -48,6 +48,6 @@ contract Scenario {
     }
     
     function getScenario(uint _version) public constant returns(uint, string) {
-        return(versions[_version].effectiveDate, versions[_version].content);
+        return(versions[_version].content);
     }
 }
