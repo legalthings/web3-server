@@ -47,7 +47,7 @@ contract Scenario {
         lastVersion = _effectiveDate;
     }
     
-    function getScenario(uint _version) public constant returns(uint, string) {
+    function getScenario(uint _version) public constant returns(string) {
         return(versions[_version].content);
     }
 }
