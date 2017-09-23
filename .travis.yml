@@ -5,16 +5,6 @@ sudo: false
 cache:
   directories:
     - node_modules
-branches:
-  only:
-  - master
-
-env:
-  global:
-  - ENVIRONMENT=production
-  - AWS_ACCESS_KEY_ID=AKIAIWFAXQWNDAHESRAA
-  - secure: "N9ES94Hks9hCBBST5KGZHtCGhaq1ke8Cr1o8a2NQxfoESBdB/xzPZEdAGrY//Qq2n1u+gIk7lyj0Ww74UosjNMFLXnqtynXob2PlORlizSi4otlUXFeagk6ViZ6fO40SGc0wOt/gXpgehEixOrExroq15LR2wXELpdXzMlgnOKCzg2IFhZtfl1elq8bCSvxqr/kjl/yD5vHF8bY1z7ToP8W3cTRFTE1oXk8p+2Q1eTZhO7dKRauVIChE7w+T28n+E8vMcU++5Ai6w/ZBRc1skUzXwrAzSbv3ZaD1QK8maX63yWxKEPM+ENytYfugks7p0NtIGTPB2zhJNJl6gqaKQnZ/sTBMg64DqzquIG1XBI12TOeNIyvs4Xq8Nyu3E+T18A2rFWp2TjVK8kfbxSeCsD1hmO/dkFM9+Sg3KHklHEzsgqzom2ajmoAzSJ5S1wwSQtjUqbhKpL5Cr4GztqCxmBok7CnHsSD4vIcg+x53lQRHgyegb3j/8Z306HcYrMPdYOsTmG4EjwCrKmoCRifg+ptj6P0uRpD/5NlGNHyimh6fKo+NxRBE5gGGP/F6trTUE0dE0RVVki5MOlcwaHlpTsFhcmCIhgeejLiTy4JWGiOdXqNFlkr6aPhuv4V2AURSfkh+1UGAkwWs48eEzZ2a+R6ry4lb1feKveHdWGhAs9M="
-
 
 before_install:
 - git config --global user.email "travis-ci@legalthings.net"
@@ -30,44 +20,3 @@ before_script:
 script:
 - npm test
 - npm run build
-
-after_success:
-- export BUMP=$(test "$TRAVIS_BRANCH" == 'master' -a "$TRAVIS_PULL_REQUEST" == "false" && echo 'yes')
-- test -z "$BUMP" || npm run bump-version
-- test -z "$BUMP" || PACKAGE_VERSION=$(git tag --contains)
-- test -n "$BUMP" || PACKAGE_VERSION="$TRAVIS_BRANCH-${TRAVIS_COMMIT:0:7}"
-- echo -e "\e[44mlegalthings/web3-server \e[1m$PACKAGE_VERSION\e[0m"
-
-before_deploy:
-- pip install --user awsebcli
-- export S3_UPLOAD_DIR="master" # Only applies to staging
-deploy:
-- provider: s3
-  edge:
-    source: jasny/dpl
-    branch: master
-  skip_cleanup: true
-  region: eu-west-1
-  bucket: web3-server
-  local_dir: dist
-  on:
-    all_branches: true
-- provider: s3
-  edge:
-    source: legalthings/dpl
-    branch: master
-  access_key_id: AKIAJQQQ7NJVV6B67VCA
-  skip_cleanup: true
-  secret_access_key:
-    secure: "Cr+3rrGeWRRdfJVsPXoAthL9x9EZMoOIlQGET9zB0E4oyUW5FQ0EC9uDBosD4tzEQBms62LV7KwqoNWcwBg/EIMNCH3/1FaVRNjmy7AOKpqWJgWhKSqioyiC7EXtLqR2dVDvKhWNK3ERZYkkyGfxqzLle044Gb08XYQ1s5uN8Qxl6LPx2h27Yu0m89z7Z+g0lFfUYSPOc6fB01HkDX7JHeTpPjmV3oHNEjakTDn1LA5S6MLnaaJbVFOB5IsuQ9LmcqECkc9IFQQqiGqfKhMUCfG1ehCzah89PXwK4SH2eSY8FBJyXhnSg9ECLfCxyrZuqjUt+fxsz5+0sbpb4gGjlMj/Ca0yA2jrrazlwHIs4MGOOYHE2bp3qAmGQOZ/1GYt41CNYEwmSSABE34INy2fbcTeRl8a1epYEkUjBU3hvBAAZLeqxAXf8lJ1NYb2wOX5DdGSmuzqiymJ4jn+/KsOIuVqRLkltBr/VAopdBOT1Ew3B1Quu4t/OF4vOsWANMDBDiEz1VKbtgbbOKdKd5Y8zFep3NPJJao1eYurH83SCfLAd+P3XFbi2fEL+PpBJv2D9f7SURLh0H18+ZxA8sxqp8CZxIRejXnYENhayiUwjsDx5QnO67+XNz7QVQJlzwQg7VvJEAVxiVTYHsdnooP033Q6XT9VZYlXif5II+T2CbY="
-  region: eu-west-1
-  bucket: web3-server
-  upload_dir: /
-  local_dir: dist
-  on:
-    branch: master
-after_deploy:
-- git checkout "$TRAVIS_BRANCH"
-- eb init --region eu-west-1 web3-server --platform Node.js
-- EB_EXISTS=$(eb list | grep -q "web3-server-master" && echo "yes")
-- test -z "$EB_EXISTS" || eb setenv -e web3-server-master ASSET_VERSION="$PACKAGE_VERSION"
